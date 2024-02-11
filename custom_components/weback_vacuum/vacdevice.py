@@ -2,7 +2,9 @@
 VacDevice Module
 """
 
+import asyncio
 import io
+import json
 import logging
 
 from .vacmap import VacMap, VacMapDraw
@@ -58,9 +60,19 @@ class VacDevice(WebackWssCtrl):
                 "Error on watch_state starting refresh_handler %s", watch_excpt
             )
 
+    def on_message(self, ws, message):
+        # Call the function on webackapi first, it'll update the status.
+        super().on_message(ws, message)
+
+        # Some vacuums won't have hismap_id in the initial status, but will
+        # report it later on. Let's make sure we try to load map again then.
+        if self.ACTIVE_MAP_ID_PROP in self.robot_status and not self.map:
+            asyncio.run(self.load_maps())
+
     async def load_maps(self):
         """Load the current reuse map"""
 
+        _LOGGER.debug("load_maps")
         if self.ACTIVE_MAP_ID_PROP not in self.robot_status:
             return False
 
